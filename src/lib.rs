@@ -1,7 +1,10 @@
 mod parse;
 
+use std::net::{AddrParseError, IpAddr, Ipv4Addr};
 use std::time::Duration;
 use bytes_size::ByteSize;
+use ini::inistr;
+use ipnet::{IpAdd, IpNet};
 use crate::parse::{AddrPort, TimeDuration};
 
 #[derive(Clone)]
@@ -9,6 +12,7 @@ pub struct Interface {
     name: String,
     public_key: String,
     listening_port: u16,
+    dns: IpAddr,
     peers: Vec<Peer>,
 }
 
@@ -17,7 +21,7 @@ pub struct Peer {
     public_key: String,
     latest_handshake: TimeDuration,
     endpoint: AddrPort,
-    allowed_ips: Vec<ipnet::IpNet>,
+    allowed_ips: Vec<IpNet>,
     transfer: Transfer,
     persistent_keepalive: TimeDuration,
 }
@@ -34,6 +38,7 @@ impl Interface {
             name: String::new(),
             public_key: String::new(),
             listening_port: 0,
+            dns: IpAddr::V4(Ipv4Addr::from(0)),
             peers: Vec::new(),
         }
     }
@@ -172,6 +177,59 @@ impl Interface {
     }
 }
 
+macro_rules! op {
+    ($ty: ty,$key: expr,$from: expr => $to:expr) => {
+        match &$from[$key] {
+            None => {}
+            Some(data) => {
+                match data.parse::<$ty>() {
+                    Ok(data) => { $to = data }
+                    Err(_) => {}
+                }
+            }
+        }
+
+    };
+}
+
+impl Interface {
+    pub fn from_file_str(s: &str) -> Result<Vec<Self>, String> {
+        let data = inistr!(s);
+        let mut imterfaces: Vec<Self> = Default::default();
+        let mut tmp_imterface: Self = Self::new();
+        for (key, value) in data.iter() {
+            match key.as_str() {
+                "interface" => {
+                    tmp_imterface = Self::new();
+                    // if let Some(dns) = &value["dns"] {
+                    //     if let Ok(dns) = dns.parse::<IpAddr>() {
+                    //         tmp_imterface.dns = dns
+                    //     }
+                    // }
+
+                    op!(IpAddr,"dns",value => tmp_imterface.dns);
+                    println!("{}",tmp_imterface.dns)
+                    // if let Some(addr) = &value["address"] {
+                    //     // if let Ok(addr)=addr.parse::<>(){
+                    //     //
+                    //     // }
+                    // }
+                }
+                "peer" => {}
+                _ => {}
+            }
+        }
+        Err("123".to_string())
+        // Interface {
+        //     name: "".to_string(),
+        //     public_key: "".to_string(),
+        //     listening_port: 0,
+        //     dns: Default::default(),
+        //     peers: vec![],
+        // }
+    }
+}
+
 impl Peer {
     fn new() -> Self {
         Self {
@@ -200,8 +258,29 @@ mod t {
     use crate::parse::AddrPort;
 
     #[test]
+    fn bb() {
+        let a = Interface::from_file_str("[Interface]
+Address = 10.13.13.2/24
+PrivateKey = OA2x4YFBii8pgEPvm9Nb7IsBamyfNlTg1lA5m5wyrUo=
+ListenPort = 51820
+DNS = 8.8.8.8
+
+#[Peer]
+#PublicKey = /A/8ru1OOVcrDMljZcHgxWYH5groyynHxcAdpRca21s=
+#Endpoint = 116.31.232.209:51820
+#AllowedIPs = 10.13.13.5/32
+
+[Peer]
+PublicKey = SoznFdDKSTgvAIeCMpYHH2y4xvaqJObS3l4AY3XVRzY=
+PresharedKey = kguCX9oPV/ACCuaeVOX5OJ9YeLEywsn2oGkCTYN7Fco=
+Endpoint = 81.71.149.31:51820
+AllowedIPs = 10.13.13.0/24
+PersistentKeepalive = 25");
+    }
+
+    #[test]
     fn aa() {
-        let a: AddrPort = "127.0.0.100:123".parse().unwrap();
+        let a: IpNet = "127.0.0.10/24".parse().unwrap();
         println!("{}", a.to_string());
     }
 

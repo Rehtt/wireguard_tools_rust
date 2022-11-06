@@ -1,7 +1,8 @@
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::ops::Add;
 use std::str::FromStr;
 use std::time::Duration;
+use ipnet::IpNet;
 
 #[derive(Debug)]
 #[derive(Clone)]
@@ -40,7 +41,7 @@ impl ToString for AddrPort {
 
 impl AddrPort {
     pub fn new() -> Self {
-        Self { addr: "0.0.0.0".parse().unwrap(), port: 0 }
+        Self { addr: IpAddr::V4(Ipv4Addr::from(0)), port: 0 }
     }
 }
 
