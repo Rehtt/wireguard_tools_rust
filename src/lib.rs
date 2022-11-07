@@ -1,32 +1,43 @@
 mod parse;
 
-use std::net::{AddrParseError, IpAddr, Ipv4Addr};
-use std::time::Duration;
+use crate::parse::{AddrPort, TimeDuration};
 use bytes_size::ByteSize;
 use ini::inistr;
 use ipnet::{IpAdd, IpNet};
-use crate::parse::{AddrPort, TimeDuration};
+use std::collections::HashMap;
+use std::net::{AddrParseError, IpAddr, Ipv4Addr};
+use std::ops::Add;
+use std::str::FromStr;
+use std::time::Duration;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Interface {
     name: String,
     public_key: String,
+    private_key: String,
     listening_port: u16,
+    address: IpNet,
     dns: IpAddr,
     peers: Vec<Peer>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Peer {
     public_key: String,
+    preshared_key: String,
     latest_handshake: TimeDuration,
     endpoint: AddrPort,
-    allowed_ips: Vec<IpNet>,
+    allowed_ips: AllowedIPs,
     transfer: Transfer,
     persistent_keepalive: TimeDuration,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
+pub struct AllowedIPs(Vec<IpNet>);
+
+#[derive(Debug, Clone)]
 pub struct Transfer {
     received: ByteSize,
     sent: ByteSize,
@@ -37,7 +48,9 @@ impl Interface {
         Self {
             name: String::new(),
             public_key: String::new(),
+            private_key: String::new(),
             listening_port: 0,
+            address: Default::default(),
             dns: IpAddr::V4(Ipv4Addr::from(0)),
             peers: Vec::new(),
         }
@@ -84,10 +97,10 @@ impl Interface {
     /// ```
     pub fn from_wg(s: &str) -> Result<Vec<Self>, String> {
         // 解析
-        let b = s.split("\n")
-            .map(|line| {
-                line.trim().split(": ").collect::<Vec<&str>>()
-            }).collect::<Vec<_>>();
+        let b = s
+            .split("\n")
+            .map(|line| line.trim().split(": ").collect::<Vec<&str>>())
+            .collect::<Vec<_>>();
 
         let mut interfaces: Vec<Self> = Vec::new();
         let mut tmp_interfacse = Self::new();
@@ -122,8 +135,10 @@ impl Interface {
                     }
                     let port = value.parse::<u16>();
                     tmp_interfacse.listening_port = match port {
-                        Ok(port) => { port }
-                        Err(_) => { return Err(format!("解析出错: {}: {}", key, value)); }
+                        Ok(port) => port,
+                        Err(_) => {
+                            return Err(format!("解析出错: {}: {}", key, value));
+                        }
                     };
                 }
                 "peer" => {
@@ -177,48 +192,58 @@ impl Interface {
     }
 }
 
-macro_rules! op {
-    ($ty: ty,$key: expr,$from: expr => $to:expr) => {
-        match &$from[$key] {
-            None => {}
-            Some(data) => {
-                match data.parse::<$ty>() {
-                    Ok(data) => { $to = data }
-                    Err(_) => {}
+macro_rules! parse_from_hashmap {
+    ($from: expr,{$(($ty: ty) $key: expr => $to:expr),*}) => {
+        {
+            $({
+                match &$from[$key] {
+                    None => {}
+                    Some(data) => {
+                        match data.parse::<$ty>() {
+                            Ok(data) => { $to = data }
+                            Err(_) => {}
+                        }
+                    }
                 }
-            }
+            };)*
         }
-
     };
 }
 
 impl Interface {
-    pub fn from_file_str(s: &str) -> Result<Vec<Self>, String> {
+    pub fn from_file_str(s: &str, name: &str) -> Result<Self, String> {
+        let mut c = configparser::ini::Ini::new();
+        let a = c.read(s.to_string()).unwrap();
+        println!("{:#?}", a);
         let data = inistr!(s);
-        let mut imterfaces: Vec<Self> = Default::default();
-        let mut tmp_imterface: Self = Self::new();
-        for (key, value) in data.iter() {
-            match key.as_str() {
-                "interface" => {
-                    tmp_imterface = Self::new();
-                    // if let Some(dns) = &value["dns"] {
-                    //     if let Ok(dns) = dns.parse::<IpAddr>() {
-                    //         tmp_imterface.dns = dns
-                    //     }
-                    // }
-
-                    op!(IpAddr,"dns",value => tmp_imterface.dns);
-                    println!("{}",tmp_imterface.dns)
-                    // if let Some(addr) = &value["address"] {
-                    //     // if let Ok(addr)=addr.parse::<>(){
-                    //     //
-                    //     // }
-                    // }
-                }
-                "peer" => {}
-                _ => {}
-            }
-        }
+        // let mut imterface: Self = Self::new();
+        // println!("{:#?}", data);
+        // match data.get("interface") {
+        //     None => {
+        //         return Err(format!("解析错误，没有interface：{}", name.to_string()));
+        //     }
+        //     Some(interface) => {
+        //         imterface.name = name.to_string();
+        //         parse_from_hashmap!(interface,{
+        //             (IpAddr) "dns"  => imterface.dns,
+        //             (IpNet) "address" => imterface.address,
+        //             (String) "privatekey" => imterface.private_key,
+        //             (u16) "listenport" => imterface.listening_port
+        //         });
+        //     }
+        // }
+        // for (key, value) in data.iter() {
+        //     if key.eq("peer") {
+        //         let mut tmp_peer = Peer::new();
+        //         parse_from_hashmap!(value,{
+        //             (String) "publickey" =>tmp_peer.public_key,
+        //             (String) "presharedkey" => tmp_peer.preshared_key,
+        //             (AddrPort) "endpoint" => tmp_peer.endpoint,
+        //             (AllowedIPs) "allowedips" => tmp_peer.allowed_ips
+        //         });
+        //         imterface.peers.push(tmp_peer);
+        //     }
+        // }
         Err("123".to_string())
         // Interface {
         //     name: "".to_string(),
@@ -234,9 +259,10 @@ impl Peer {
     fn new() -> Self {
         Self {
             public_key: String::new(),
+            preshared_key: String::new(),
             latest_handshake: Default::default(),
             endpoint: AddrPort::new(),
-            allowed_ips: Vec::new(),
+            allowed_ips: Default::default(),
             transfer: Default::default(),
             persistent_keepalive: Default::default(),
         }
@@ -248,34 +274,96 @@ impl Peer {
 
 impl Default for Transfer {
     fn default() -> Self {
-        Self { received: Default::default(), sent: Default::default() }
+        Self {
+            received: Default::default(),
+            sent: Default::default(),
+        }
+    }
+}
+
+impl FromStr for AllowedIPs {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut ipnets: Vec<IpNet> = Vec::new();
+        for datum in s.trim().split(",").collect::<Vec<_>>().iter() {
+            if let Ok(x) = datum.parse::<IpNet>() {
+                ipnets.push(x);
+            }
+        }
+        Ok(Self { 0: ipnets })
+    }
+}
+
+impl ToString for AllowedIPs {
+    fn to_string(&self) -> String {
+        let mut out = String::new();
+        for (i, x) in self.0.iter().enumerate() {
+            out.push_str(x.to_string().as_str());
+            if i < self.0.len() - 1 {
+                out.push_str(",")
+            }
+        }
+        out
+    }
+}
+
+impl Default for AllowedIPs {
+    fn default() -> Self {
+        Self(Vec::new())
     }
 }
 
 mod t {
-    use ipnet::IpNet;
+    use crate::parse::{AddrPort, InI};
     use crate::Interface;
-    use crate::parse::AddrPort;
+    use ipnet::IpNet;
 
     #[test]
-    fn bb() {
-        let a = Interface::from_file_str("[Interface]
+    fn parse() {
+        let a = "[Interface]
 Address = 10.13.13.2/24
 PrivateKey = OA2x4YFBii8pgEPvm9Nb7IsBamyfNlTg1lA5m5wyrUo=
 ListenPort = 51820
 DNS = 8.8.8.8
 
-#[Peer]
-#PublicKey = /A/8ru1OOVcrDMljZcHgxWYH5groyynHxcAdpRca21s=
-#Endpoint = 116.31.232.209:51820
-#AllowedIPs = 10.13.13.5/32
+[Peer]
+PublicKey = /A/8ru1OOVcrDMljZcHgxWYH5groyynHxcAdpRca21s=
+Endpoint = 116.31.232.209:51820
+AllowedIPs = 10.13.13.5/32
 
 [Peer]
 PublicKey = SoznFdDKSTgvAIeCMpYHH2y4xvaqJObS3l4AY3XVRzY=
 PresharedKey = kguCX9oPV/ACCuaeVOX5OJ9YeLEywsn2oGkCTYN7Fco=
 Endpoint = 81.71.149.31:51820
-AllowedIPs = 10.13.13.0/24
-PersistentKeepalive = 25");
+AllowedIPs = 10.13.13.0/24,192.168.31.1/32
+PersistentKeepalive = 25";
+        a.parse::<InI>();
+    }
+
+    #[test]
+    fn bb() {
+        let a = Interface::from_file_str(
+            "[Interface]
+Address = 10.13.13.2/24
+PrivateKey = OA2x4YFBii8pgEPvm9Nb7IsBamyfNlTg1lA5m5wyrUo=
+ListenPort = 51820
+DNS = 8.8.8.8
+
+[Peer]
+PublicKey = /A/8ru1OOVcrDMljZcHgxWYH5groyynHxcAdpRca21s=
+Endpoint = 116.31.232.209:51820
+AllowedIPs = 10.13.13.5/32
+
+[Peer]
+PublicKey = SoznFdDKSTgvAIeCMpYHH2y4xvaqJObS3l4AY3XVRzY=
+PresharedKey = kguCX9oPV/ACCuaeVOX5OJ9YeLEywsn2oGkCTYN7Fco=
+Endpoint = 81.71.149.31:51820
+AllowedIPs = 10.13.13.0/24,192.168.31.1/32
+PersistentKeepalive = 25",
+            "wg0",
+        );
+        println!("{:?}", a)
     }
 
     #[test]
