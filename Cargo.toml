@@ -1,12 +1,16 @@
 [package]
-name = "wireguard_tools_rust"
+name = "wireguard_tools"
 version = "0.1.0"
 edition = "2021"
+description = "一个wireguard工具的库"
+license = "MIT"
+documentation = "https://docs.rs/wireguard_tools"
+homepage = "https://github.com/Rehtt/wireguard_tools_rust"
+repository = "https://github.com/Rehtt/wireguard_tools_rust"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 bytes_size = "0.1.2"
 ipnet = "2.5.0"
-ini = "1.3.0"
-configparser = "3.0.2"
+ini_lib="0.1.3"
