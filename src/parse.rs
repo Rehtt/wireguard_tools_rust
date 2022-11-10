@@ -116,7 +116,7 @@ impl Interface {
     ///
     /// # Example
     /// ```
-    /// use wireguard_tools_rust::Interface;
+    /// use wireguard_tools_rehtt::Interface;
     /// let a = "
     /// interface: wg0
     ///   public key: public_key1
@@ -175,7 +175,6 @@ impl Interface {
                 }
                 "public key" => {
                     if tmp_interfacse.is_none() {
-                        println!("{}", value);
                         continue;
                     }
                     tmp_interfacse.public_key = Some(value.to_string());
@@ -313,7 +312,6 @@ impl Interface {
                         parse_from_hashmap!(value.sub,<AddrPort>"Endpoint"=>tmp_peer.endpoint);
                         parse_from_hashmap!(value.sub,<AllowedIPs>"AllowedIPs"=>tmp_peer.allowed_ips);
                         imterface.peers.push(tmp_peer.clone());
-                        println!("{:?}", value.sub);
                     }
                 }
                 Ok(imterface)
@@ -326,7 +324,7 @@ impl Interface {
     ///
     /// # Example
     /// ```
-    /// use wireguard_tools_rust::Interface;
+    /// use wireguard_tools_rehtt::Interface;
     /// let data = Interface::from_file("/etc/wireguard/wg0.conf");
     /// println!("{:#?}",data);
     /// ```

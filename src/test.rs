@@ -1,6 +1,8 @@
 mod test {
     #[allow(unused_imports)]
     use crate::Interface;
+    #[allow(unused_imports)]
+    use crate::CMD;
 
     #[test]
     fn parse_file_to_wg_struct() {
@@ -58,5 +60,10 @@ peer: public_key4
 
         // 解析
         println!("{:#?}", Interface::from_wg(a));
+    }
+
+    #[test]
+    fn cmd_show() {
+        println!("{:#?}", CMD::show_all())
     }
 }
